@@ -66,7 +66,8 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Пути
     raw_input_path = f"/tmp/{doc.file_unique_id}{ext}"
     telegram_file = await doc.get_file()
-    await telegram_file.download_to_drive(raw_input_path)    logger.info(f"Downloaded: {raw_input_path}")
+    await telegram_file.download_to_drive(raw_input_path)
+    logger.info(f"Downloaded: {raw_input_path}")
 
     input_path = raw_input_path
     output_path = input_path
