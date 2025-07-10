@@ -1,0 +1,11 @@
+version: "3.9"
+
+services:
+  kindle-bot:
+    build: .
+    container_name: kindle-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./tmp:/tmp
