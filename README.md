@@ -10,6 +10,7 @@ Runs inside Docker. Requires a Kindle email address and SMTP credentials.
 - Converts them to `.epub` using Calibre
 - Sends converted books to your Kindle email
 - Easy deployment with Docker Compose
+- Accepts manga and comic book archives in `.zip`, `.cbz`, or `.cbr` formats
 
 ## Requirements
 
@@ -27,7 +28,7 @@ git clone https://github.com/yourusername/kindle-telegram-bot.git
 cd kindle-telegram-bot
 ```
 
-2. Create a `.env` file in the root directory:
+2. Create a `.env` file.  in the root directory:
 
 ```ini
 TELEGRAM_TOKEN=your_telegram_bot_token
@@ -69,7 +70,37 @@ python bot.py
 
 - Only `.fb2` files are accepted by the bot.
 - Make sure Calibre is able to convert FB2 to EPUB (standard functionality).
+- ZIP, CBZ, and CBR files are treated as comic books and sent as-is without conversion.
 
 ## License
 
 MIT License
+
+# Telegram Kindle Bot
+
+A Telegram bot that accepts `.fb2` and `.cbr` books, automatically converts them to `.epub` and emails them to your Kindle.
+
+## Features
+
+- Accepts `.fb2` and `.cbr` files via Telegram
+- Converts to `.epub` using Calibre
+- Adds ISBN or ASIN when possible
+- Sends to user's Kindle email address
+- Each user can register their own Kindle address
+- Admin receives logs of all uploads
+
+## Usage
+
+- Send the bot an `.fb2` or `.cbr` file
+- It will convert and send the result to your Kindle
+- Use `/email` to set or update your Kindle address
+- Use `/help` for usage info
+
+## Format Support
+
+- Input: `.fb2`, `.zip` (with `.fb2`), `.cbr`
+- Output: `.epub` with embedded metadata
+
+## License
+
+MIT

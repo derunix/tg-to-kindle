@@ -106,7 +106,7 @@ SUPPORTED_KINDLE_EXTENSIONS = {
     ".epub", ".pdf", ".doc", ".docx", ".rtf", ".txt",
     ".html", ".htm", ".azw", ".azw3", ".azw4",
     ".jpg", ".jpeg", ".png", ".bmp", ".gif",
-    ".zip"  # Manga archives
+    ".zip", ".cbz", ".cbr"  # Manga/Comic archives
 }
 
 # --- Логгирование ---
@@ -215,7 +215,7 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if compress_pdf(raw_input_path, compressed_path):
             raw_input_path = compressed_path
             logger.info(f"PDF compressed to {raw_input_path}")
-    elif ext == ".zip":
+    elif ext in [".zip", ".cbz"]:
         # Предполагаем, что это архив с изображениями манги
         import zipfile
         import tempfile
