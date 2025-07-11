@@ -1,3 +1,5 @@
+from telegram.request import HTTPXRequest
+from httpx import Timeout
 import os
 import logging
 import smtplib
@@ -8,7 +10,6 @@ from pathlib import Path
 import rarfile
 import re
 import requests
-import time
 
 def compress_pdf(input_path: str, output_path: str) -> bool:
     try:
@@ -51,51 +52,33 @@ def find_isbn_by_title_author(title: str, author: str) -> str | None:
         logger.warning(f"Failed to fetch ISBN: {e}")
     return None
 
-# --- Поиск ASIN по ISBN ---
-def find_asin_by_isbn(isbn: str) -> str | None:
-    try:
-        url = f"https://www.amazon.com/dp/{isbn}"
-        resp = requests.head(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
-        if resp.status_code == 200:
-            logger.info(f"ASIN fallback via ISBN worked: {isbn}")
-            return isbn
-        else:
-            logger.info(f"ASIN fallback via ISBN failed: HTTP {resp.status_code}")
-    except Exception as e:
-        logger.warning(f"ASIN lookup by ISBN failed: {e}")
-    return None
 
 # --- Поиск ASIN по названию и автору ---
 def find_asin_by_title_author(title: str, author: str) -> str | None:
     query = f"{title} {author}".strip()
+    # Try to use ISBN as ASIN directly if available
+    isbn = find_isbn_by_title_author(title, author)
+    if isbn:
+        logger.info(f"Using ISBN as ASIN directly: {isbn}")
+        return f"amazon:{isbn}"
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
     }
     logger.info(f"Searching ASIN for: {query}")
-    for attempt in range(3):
-        try:
-            resp = requests.get("https://www.amazon.com/s", params={"k": query}, headers=headers, timeout=10)
-            if resp.ok:
-                matches = re.findall(r"/dp/([A-Z0-9]{10})", resp.text)
-                logger.info(f"ASIN raw matches: {matches}")
-                if matches:
-                    logger.info(f"Using ASIN: {matches[0]}")
-                    return matches[0]
-                else:
-                    logger.info("No ASIN found in page.")
-                break
+    try:
+        resp = requests.get("https://www.amazon.com/s", params={"k": query}, headers=headers, timeout=10)
+        if resp.ok:
+            matches = re.findall(r"/dp/([A-Z0-9]{10})", resp.text)
+            logger.info(f"ASIN raw matches: {matches}")
+            if matches:
+                logger.info(f"Using ASIN: {matches[0]}")
+                return matches[0]
             else:
-                logger.warning(f"Amazon search failed: HTTP {resp.status_code}")
-        except Exception as e:
-            logger.warning(f"Failed to fetch ASIN (attempt {attempt+1}/3): {e}")
-        time.sleep(5)
-    # fallback: try ISBN if available
-    isbn = find_isbn_by_title_author(title, author)
-    if isbn:
-        logger.info(f"Trying ASIN fallback by ISBN: {isbn}")
-        asin = find_asin_by_isbn(isbn)
-        if asin:
-            return asin
+                logger.info("No ASIN found in page.")
+        else:
+            logger.warning(f"Amazon search failed: HTTP {resp.status_code}")
+    except Exception as e:
+        logger.warning(f"Failed to fetch ASIN: {e}")
     return None
 
 from telegram import Update, Document
@@ -281,7 +264,6 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
         cmd = [CONVERT_PATH, input_html, epub_output, "--cover", cover_image_path, "--page-breaks-before", "/"]
         try:
             subprocess.run(cmd, check=True)
-            await update.message.reply_document(document=open(epub_output, "rb"), filename=Path(epub_output).name)
             output_path = epub_output
             logger.info(f"Converted manga ZIP to EPUB: {epub_output}")
             input_path = epub_output
@@ -303,8 +285,6 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 try:
                     subprocess.run([METADATA_TOOL, epub_output, "--isbn", isbn], check=True)
                     logger.info(f"Set ISBN for EPUB: {isbn}")
-                    # Отправка EPUB с ISBN в Telegram (отладка)
-                    await update.message.reply_document(document=open(epub_output, "rb"), filename=Path(epub_output).name, caption=f"📎 EPUB with ISBN: {isbn}")
                 except subprocess.CalledProcessError as e:
                     logger.warning(f"Failed to set ISBN metadata: {e}")
             # --- Установка ASIN для EPUB ---
@@ -312,10 +292,12 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if asin:
                 logger.info(f"Found ASIN: {asin}")
                 try:
-                    subprocess.run([METADATA_TOOL, epub_output, "--identifier", f"amazon:{asin}"], check=True)
-                    logger.info(f"Set ASIN for EPUB: {asin}")
+                    subprocess.run([METADATA_TOOL, epub_output, "--identifier", f"BookId:amazon:{asin}"], check=True)
+                    logger.info(f"ASIN metadata set using scheme 'BookId:amazon': {asin}")
                 except subprocess.CalledProcessError as e:
                     logger.warning(f"Failed to set ASIN metadata: {e}")
+            # Отправка EPUB с полной метаинформацией в Telegram (после ISBN и ASIN)
+            await update.message.reply_document(document=open(output_path, "rb"), filename=Path(output_path).name, caption="📎 EPUB with full metadata")
         except subprocess.CalledProcessError as e:
             logger.error(f"Manga conversion failed: {e}")
             await update.message.reply_text("❌ Failed to convert manga archive.")
@@ -371,7 +353,6 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
         cmd = [CONVERT_PATH, input_html, epub_output, "--cover", cover_image_path, "--page-breaks-before", "/"]
         try:
             subprocess.run(cmd, check=True)
-            await update.message.reply_document(document=open(epub_output, "rb"), filename=Path(epub_output).name)
             logger.info(f"Converted CBR to EPUB: {epub_output}")
             # Make sure input_path/output_path refer to the actual output
             input_path = epub_output
@@ -393,8 +374,6 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 try:
                     subprocess.run([METADATA_TOOL, epub_output, "--isbn", isbn], check=True)
                     logger.info(f"Set ISBN for EPUB: {isbn}")
-                    # Отправка EPUB с ISBN в Telegram (отладка)
-                    await update.message.reply_document(document=open(epub_output, "rb"), filename=Path(epub_output).name, caption=f"📎 EPUB with ISBN: {isbn}")
                 except subprocess.CalledProcessError as e:
                     logger.warning(f"Failed to set ISBN metadata: {e}")
             # --- Установка ASIN для EPUB ---
@@ -402,10 +381,12 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if asin:
                 logger.info(f"Found ASIN: {asin}")
                 try:
-                    subprocess.run([METADATA_TOOL, epub_output, "--identifier", f"amazon:{asin}"], check=True)
-                    logger.info(f"Set ASIN for EPUB: {asin}")
+                    subprocess.run([METADATA_TOOL, epub_output, "--identifier", f"BookId:amazon:{asin}"], check=True)
+                    logger.info(f"ASIN metadata set using scheme 'BookId:amazon': {asin}")
                 except subprocess.CalledProcessError as e:
                     logger.warning(f"Failed to set ASIN metadata: {e}")
+            # Отправка EPUB с полной метаинформацией в Telegram (после ISBN и ASIN)
+            await update.message.reply_document(document=open(output_path, "rb"), filename=Path(output_path).name, caption="📎 EPUB with full metadata")
         except subprocess.CalledProcessError as e:
             logger.error(f"CBR conversion failed: {e}")
             await update.message.reply_text("❌ Failed to convert CBR archive.")
@@ -451,8 +432,6 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
             try:
                 subprocess.run([METADATA_TOOL, output_path, "--isbn", isbn], check=True)
                 logger.info(f"Set ISBN for EPUB: {isbn}")
-                # Отправка EPUB с ISBN в Telegram (отладка)
-                await update.message.reply_document(document=open(output_path, "rb"), filename=Path(output_path).name, caption=f"📎 EPUB with ISBN: {isbn}")
             except subprocess.CalledProcessError as e:
                 logger.warning(f"Failed to set ISBN metadata: {e}")
         # --- Установка ASIN для EPUB ---
@@ -460,10 +439,12 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if asin:
             logger.info(f"Found ASIN: {asin}")
             try:
-                subprocess.run([METADATA_TOOL, output_path, "--identifier", f"amazon:{asin}"], check=True)
-                logger.info(f"Set ASIN for EPUB: {asin}")
+                subprocess.run([METADATA_TOOL, output_path, "--identifier", f"BookId:amazon:{asin}"], check=True)
+                logger.info(f"ASIN metadata set using scheme 'BookId:amazon': {asin}")
             except subprocess.CalledProcessError as e:
                 logger.warning(f"Failed to set ASIN metadata: {e}")
+        # Отправка EPUB с полной метаинформацией в Telegram (после ISBN и ASIN)
+        await update.message.reply_document(document=open(output_path, "rb"), filename=Path(output_path).name, caption="📎 EPUB with full metadata")
     else:
         if not doc.file_name:
             final_name = f"{doc.file_unique_id}{ext}"
@@ -517,8 +498,10 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Email send error: {e}")
         await update.message.reply_text(f"❌ Failed to send email: {e}")
         return
-
-    await update.message.reply_text("✅ Done. Check your Kindle.")
+    try:
+        await update.message.reply_text("✅ Done. Check your Kindle.")
+    except Exception as e:
+        logger.warning(f"Failed to send final Telegram message: {e}")
 
 # --- Запуск приложения ---
 def main():
@@ -528,12 +511,18 @@ def main():
 
     init_db()
 
-    app = Application.builder().token(TELEGRAM_TOKEN).build()
+    request = HTTPXRequest()
+    app = Application.builder().token(TELEGRAM_TOKEN).request(request).build()
     app.add_handler(CommandHandler("start", cmd_help))
     app.add_handler(CommandHandler("help", cmd_help))
     app.add_handler(CommandHandler("setemail", cmd_setemail))
     app.add_handler(CommandHandler("getemail", cmd_getemail))
     app.add_handler(MessageHandler(filters.Document.ALL, handle_file))
+
+    async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+        logger.error("Exception while handling an update:", exc_info=context.error)
+
+    app.add_error_handler(error_handler)
 
     logger.info("Bot started.")
     app.run_polling()
