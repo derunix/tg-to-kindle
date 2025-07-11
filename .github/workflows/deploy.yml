@@ -2,7 +2,7 @@ name: Deploy to Server
 
 on:
   push:
-    branches: [ main ] 
+    branches: [ main ]
 
 jobs:
   deploy:
@@ -12,19 +12,20 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Deploy over SSH
+    - name: Set up SSH
+      uses: webfactory/ssh-agent@v0.9.0
+      with:
+        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+    - name: Add known hosts
       run: |
-        ssh -tt -i ~/.ssh/id_ed25519 ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
-          echo "--- Connected to server and starting deployment ---"
-          cd /root/tg-to-kindle
-          git pull
-          docker-compose down
-          docker-compose up -d --build
-        EOF
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SSH_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
 
     - name: Deploy over SSH
       run: |
-        ssh -i ~/.ssh/id_ed25519 ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
+        ssh root@45.142.44.15 << 'EOF'
+          echo "--- Connected ---"
           cd /root/tg-to-kindle
           git pull
           docker-compose down
