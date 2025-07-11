@@ -1,11 +1,16 @@
-FROM python:3.14-slim-bookworm
-RUN echo "deb http://deb.debian.org/debian bookworm main contrib non-free non-free-firmware" > /etc/apt/sources.list
+FROM python:3.13-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    wget xz-utils calibre ghostscript libarchive-tools unrar && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
-
-ENV CONVERT_PATH="/usr/bin/ebook-convert"
+    wget \
+    xz-utils \
+    ghostscript \
+    libarchive-tools \
+    p7zip-full \
+    ca-certificates \
+    libegl1 \
+    libopengl0 \
+    libxcb-cursor0 \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 COPY requirements.txt .
@@ -13,4 +18,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY bot.py .
 
+# Установка Calibre
+RUN wget -O calibre-installer.sh https://download.calibre-ebook.com/linux-installer.sh && \
+    bash calibre-installer.sh && \
+    rm calibre-installer.sh
+
+ENV CONVERT_PATH="/opt/calibre/ebook-convert"
 CMD ["python", "bot.py"]
