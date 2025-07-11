@@ -8,4 +8,5 @@ services:
     env_file:
       - .env
     volumes:
-      - ./tmp:/tmp
+      - ./data:/data   # база будет доступна на хосте в ./data/users.db
+      - ./tmp:/tmp     # (опционально) временные файлы
