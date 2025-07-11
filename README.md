@@ -32,7 +32,6 @@ cd kindle-telegram-bot
 
 ```ini
 TELEGRAM_TOKEN=your_telegram_bot_token
-KINDLE_EMAIL=your_kindle_email@kindle.com
 SMTP_SERVER=smtp.gmail.com
 SMTP_PORT=587
 SMTP_LOGIN=your@gmail.com
