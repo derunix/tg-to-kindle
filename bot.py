@@ -100,6 +100,7 @@ SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 SMTP_LOGIN = os.getenv("SMTP_LOGIN")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+ADMIN_USER_ID = int(os.getenv("ADMIN_USER_ID", "0"))
 
 SUPPORTED_KINDLE_EXTENSIONS = {
     ".epub", ".pdf", ".doc", ".docx", ".rtf", ".txt",
@@ -259,7 +260,7 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f.write(f'<div><img src="{rel_path}" style="width:100%;"/></div>\n')
             f.write("</body>\n</html>\n")
 
-        await update.message.reply_document(document=open(input_html, "rb"), filename=Path(input_html).name)
+        # await update.message.reply_document(document=open(input_html, "rb"), filename=Path(input_html).name)
 
         cmd = [CONVERT_PATH, input_html, epub_output, "--cover", cover_image_path, "--page-breaks-before", "/"]
         try:
@@ -276,7 +277,7 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 subprocess.run(meta_cmd, check=True)
                 logger.info(f"Set EPUB metadata for manga: title='{title}' author='{author}'")
             except subprocess.CalledProcessError as e:
-                logger.warning(f"Failed to set EPUB metadata: {e}")
+                pass
 
             # --- Установка ISBN для EPUB ---
             isbn = find_isbn_by_title_author(title, author)
@@ -286,7 +287,7 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     subprocess.run([METADATA_TOOL, epub_output, "--isbn", isbn], check=True)
                     logger.info(f"Set ISBN for EPUB: {isbn}")
                 except subprocess.CalledProcessError as e:
-                    logger.warning(f"Failed to set ISBN metadata: {e}")
+                    pass
             # --- Установка ASIN для EPUB ---
             asin = find_asin_by_title_author(title, author)
             if asin:
@@ -295,11 +296,11 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     subprocess.run([METADATA_TOOL, epub_output, "--identifier", f"BookId:amazon:{asin}"], check=True)
                     logger.info(f"ASIN metadata set using scheme 'BookId:amazon': {asin}")
                 except subprocess.CalledProcessError as e:
-                    logger.warning(f"Failed to set ASIN metadata: {e}")
+                    pass
             # Отправка EPUB с полной метаинформацией в Telegram (после ISBN и ASIN)
-            await update.message.reply_document(document=open(output_path, "rb"), filename=Path(output_path).name, caption="📎 EPUB with full metadata")
+            # await update.message.reply_document(document=open(output_path, "rb"), filename=Path(output_path).name, caption="📎 EPUB with full metadata")
         except subprocess.CalledProcessError as e:
-            logger.error(f"Manga conversion failed: {e}")
+            pass
             await update.message.reply_text("❌ Failed to convert manga archive.")
             return
     elif ext == ".cbr":
@@ -344,12 +345,12 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f.write(f'<div><img src="{rel_path}" style="width:100%;"/></div>\n')
             f.write("</body>\n</html>\n")
 
-        await update.message.reply_document(document=open(input_html, "rb"), filename=Path(input_html).name)
+        # await update.message.reply_document(document=open(input_html, "rb"), filename=Path(input_html).name)
 
         # --- EPUB conversion with input_html/epub_output collision check ---
         if os.path.abspath(input_html) == os.path.abspath(epub_output):
             epub_output = epub_output.replace(".epub", "_converted.epub")
-            logger.warning(f"EPUB output path adjusted to avoid conflict: {epub_output}")
+            pass
         cmd = [CONVERT_PATH, input_html, epub_output, "--cover", cover_image_path, "--page-breaks-before", "/"]
         try:
             subprocess.run(cmd, check=True)
@@ -366,7 +367,7 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 subprocess.run(meta_cmd, check=True)
                 logger.info(f"Set EPUB metadata for CBR: title='{title}' author='{author}'")
             except subprocess.CalledProcessError as e:
-                logger.warning(f"Failed to set EPUB metadata: {e}")
+                pass
             # --- Установка ISBN для EPUB ---
             isbn = find_isbn_by_title_author(title, author)
             if isbn:
@@ -375,7 +376,7 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     subprocess.run([METADATA_TOOL, epub_output, "--isbn", isbn], check=True)
                     logger.info(f"Set ISBN for EPUB: {isbn}")
                 except subprocess.CalledProcessError as e:
-                    logger.warning(f"Failed to set ISBN metadata: {e}")
+                    pass
             # --- Установка ASIN для EPUB ---
             asin = find_asin_by_title_author(title, author)
             if asin:
@@ -384,11 +385,11 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     subprocess.run([METADATA_TOOL, epub_output, "--identifier", f"BookId:amazon:{asin}"], check=True)
                     logger.info(f"ASIN metadata set using scheme 'BookId:amazon': {asin}")
                 except subprocess.CalledProcessError as e:
-                    logger.warning(f"Failed to set ASIN metadata: {e}")
+                    pass
             # Отправка EPUB с полной метаинформацией в Telegram (после ISBN и ASIN)
-            await update.message.reply_document(document=open(output_path, "rb"), filename=Path(output_path).name, caption="📎 EPUB with full metadata")
+            # await update.message.reply_document(document=open(output_path, "rb"), filename=Path(output_path).name, caption="📎 EPUB with full metadata")
         except subprocess.CalledProcessError as e:
-            logger.error(f"CBR conversion failed: {e}")
+            pass
             await update.message.reply_text("❌ Failed to convert CBR archive.")
             return
     # input_path = raw_input_path
@@ -407,7 +408,7 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 cmd += ["--cover", DEFAULT_COVER]
             subprocess.run(cmd, check=True)
         except subprocess.CalledProcessError as e:
-            logger.error(f"Conversion failed: {e}")
+            pass
             await update.message.reply_text("❌ Conversion failed.")
             return
 
@@ -433,7 +434,7 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 subprocess.run([METADATA_TOOL, output_path, "--isbn", isbn], check=True)
                 logger.info(f"Set ISBN for EPUB: {isbn}")
             except subprocess.CalledProcessError as e:
-                logger.warning(f"Failed to set ISBN metadata: {e}")
+                pass
         # --- Установка ASIN для EPUB ---
         asin = find_asin_by_title_author(title, author)
         if asin:
@@ -442,9 +443,9 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 subprocess.run([METADATA_TOOL, output_path, "--identifier", f"BookId:amazon:{asin}"], check=True)
                 logger.info(f"ASIN metadata set using scheme 'BookId:amazon': {asin}")
             except subprocess.CalledProcessError as e:
-                logger.warning(f"Failed to set ASIN metadata: {e}")
+                pass
         # Отправка EPUB с полной метаинформацией в Telegram (после ISBN и ASIN)
-        await update.message.reply_document(document=open(output_path, "rb"), filename=Path(output_path).name, caption="📎 EPUB with full metadata")
+        # await update.message.reply_document(document=open(output_path, "rb"), filename=Path(output_path).name, caption="📎 EPUB with full metadata")
     else:
         if not doc.file_name:
             final_name = f"{doc.file_unique_id}{ext}"
@@ -461,7 +462,7 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     subprocess.run(cmd, check=True)
                     logger.info(f"Updated PDF metadata: title='{title}' author='{author}'")
                 except subprocess.CalledProcessError as e:
-                    logger.warning(f"PDF metadata update failed: {e}")
+                    pass
 
             if author or title:
                 safe_title = "".join(c for c in title if c.isalnum() or c in " _-").strip()
@@ -495,18 +496,18 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
             server.send_message(msg)
         logger.info(f"Sent to {kindle_email}: {output_path}")
     except Exception as e:
-        logger.error(f"Email send error: {e}")
+        pass
         await update.message.reply_text(f"❌ Failed to send email: {e}")
         return
     try:
         await update.message.reply_text("✅ Done. Check your Kindle.")
     except Exception as e:
-        logger.warning(f"Failed to send final Telegram message: {e}")
+        pass
 
 # --- Запуск приложения ---
 def main():
     if not TELEGRAM_TOKEN:
-        logger.error("TELEGRAM_TOKEN missing")
+        pass
         return
 
     init_db()
@@ -520,7 +521,7 @@ def main():
     app.add_handler(MessageHandler(filters.Document.ALL, handle_file))
 
     async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
-        logger.error("Exception while handling an update:", exc_info=context.error)
+        pass
 
     app.add_error_handler(error_handler)
 
