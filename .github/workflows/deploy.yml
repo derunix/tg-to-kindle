@@ -20,14 +20,14 @@ jobs:
     - name: Add known hosts
       run: |
         mkdir -p ~/.ssh
-        echo "${{ secrets.SSH_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
+        echo "${{ secrets.SERVER_HOST }}" >> ~/.ssh/known_hosts
 
     - name: Deploy over SSH
       run: |
-        ssh root@45.142.44.15 << 'EOF'
+        ssh root@${{ secrets.SSH_KNOWN_HOSTS }} << 'EOF'
           echo "--- Connected ---"
           cd /root/tg-to-kindle
           git pull
-          docker-compose down
-          docker-compose up -d --build
+          docker compose down
+          docker compose up -d --build
         EOF
