@@ -201,6 +201,40 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     doc: Document = update.message.document
+    if Path(doc.file_name or "").suffix.lower() == ".epub":
+        # EPUB не требует конвертации, сразу отправляем
+        raw_input_path = f"/tmp/{doc.file_unique_id}.epub"
+        telegram_file = await doc.get_file()
+        await telegram_file.download_to_drive(raw_input_path)
+        logger.info(f"Downloaded EPUB: {raw_input_path}")
+
+        await update.message.reply_text("📤 Sending EPUB to Kindle...")
+
+        msg = EmailMessage()
+        msg["Subject"] = ""
+        msg["From"] = SMTP_LOGIN
+        msg["To"] = kindle_email
+        msg.set_content("Document for Kindle")
+
+        with open(raw_input_path, "rb") as f:
+            msg.add_attachment(
+                f.read(),
+                maintype="application",
+                subtype="octet-stream",
+                filename=Path(raw_input_path).name
+            )
+
+        try:
+            with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+                server.starttls()
+                server.login(SMTP_LOGIN, SMTP_PASSWORD)
+                server.send_message(msg)
+            logger.info(f"Sent EPUB to {kindle_email}: {raw_input_path}")
+            await update.message.reply_text("✅ EPUB sent to Kindle.")
+        except Exception as e:
+            logger.warning(f"Failed to send EPUB: {e}")
+            await update.message.reply_text(f"❌ Failed to send email: {e}")
+        return
     file_name = doc.file_name or f"{doc.file_unique_id}"
     ext = Path(file_name).suffix.lower()
 
