@@ -428,6 +428,7 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Ensure input_path is defined for conversion block below
     input_path = raw_input_path
+    output_path = input_path  # Инициализация output_path перед проверкой
 
     if ext not in SUPPORTED_KINDLE_EXTENSIONS or Path(output_path).suffix.lower() != ".epub":
         output_path = str(Path(input_path).with_suffix(".epub"))
@@ -498,11 +499,13 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if author or title:
                 safe_title = "".join(c for c in title if c.isalnum() or c in " _-").strip()
                 safe_author = "".join(c for c in author if c.isalnum() or c in " _-").strip()
-                new_name = f"{safe_title} - {safe_author}".strip(" -") + ".epub"
+                new_name = f"{safe_title} - {safe_author}".strip(" -") + ".pdf"
                 new_path = f"/tmp/{new_name}"
                 os.rename(input_path, new_path)
                 input_path = new_path
                 output_path = new_path
+            else:
+                output_path = input_path
         else:
             output_path = input_path
 
