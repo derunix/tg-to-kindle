@@ -208,6 +208,28 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await telegram_file.download_to_drive(raw_input_path)
         logger.info(f"Downloaded EPUB: {raw_input_path}")
 
+        # --- Метаданные и переименование EPUB ---
+        meta = extract_metadata(raw_input_path)
+        title = meta.get("title", "").strip()
+        author = meta.get("author(s)", meta.get("authors", "")).strip()
+
+        if title or author:
+            safe_title = "".join(c for c in title if c.isalnum() or c in " _-").strip()
+            safe_author = "".join(c for c in author if c.isalnum() or c in " _-").strip()
+            final_name = f"{safe_title} - {safe_author}".strip(" -") + ".epub"
+            final_output_path = f"/tmp/{final_name}"
+            os.rename(raw_input_path, final_output_path)
+            raw_input_path = final_output_path
+            try:
+                meta_cmd = [METADATA_TOOL, raw_input_path]
+                if title:
+                    meta_cmd += ["--title", title]
+                if author:
+                    meta_cmd += ["--authors", author]
+                subprocess.run(meta_cmd, check=True)
+            except subprocess.CalledProcessError:
+                logger.warning(f"Failed to set EPUB metadata for {raw_input_path}")
+
         await update.message.reply_text("📤 Sending EPUB to Kindle...")
 
         msg = EmailMessage()
