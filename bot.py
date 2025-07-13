@@ -10,6 +10,7 @@ from pathlib import Path
 import rarfile
 import re
 import requests
+from unzip_safe import unzip_safe
 
 def compress_pdf(input_path: str, output_path: str) -> bool:
     try:
@@ -225,93 +226,58 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
             raw_input_path = compressed_path
             logger.info(f"PDF compressed to {raw_input_path}")
     elif ext in [".zip", ".cbz"]:
-        # Предполагаем, что это архив с изображениями манги
-        import zipfile
         import tempfile
+        from unzip_safe import unzip_safe
 
-        with zipfile.ZipFile(raw_input_path, 'r') as zip_ref:
-            extract_dir = tempfile.mkdtemp()
-            zip_ref.extractall(extract_dir)
-            logger.info(f"Extracted ZIP to {extract_dir}")
-
-        # Создание EPUB из изображений
-        author, title = guess_author_title_from_filename(file_name)
-        title = title or "Untitled Manga"
-        author = author or "Unknown"
-
-        safe_title = "".join(c for c in title if c.isalnum() or c in " _-").strip()
-        safe_author = "".join(c for c in author if c.isalnum() or c in " _-").strip()
-        base_name = f"{safe_author} - {safe_title}".strip(" -")
-
-        epub_output = f"/tmp/{base_name}.epub"
-
-        image_files = sorted([
-            str(p) for p in Path(extract_dir).rglob("*")
-            if p.suffix.lower() in {".jpg", ".jpeg", ".png"}
-        ])
-
-        if not image_files:
-            await update.message.reply_text("❌ ZIP does not contain supported images.")
-            return
-
-        # Сохраняем путь к первой картинке как обложку
-        cover_image_path = image_files[0]
-
-        input_html = os.path.join(extract_dir, f"{base_name}.html")
-
-        with open(input_html, "w") as f:
-            f.write('<!DOCTYPE html>\n<html xmlns="http://www.w3.org/1999/xhtml">\n<head>\n<meta charset="utf-8"/>\n')
-            f.write(f"<title>{title}</title>")
-            f.write("</head>\n")
-            f.write("<body>\n")
-            for img_path in image_files:
-                rel_path = os.path.relpath(img_path, extract_dir)
-                f.write(f'<div><img src="{rel_path}" style="width:100%;"/></div>\n')
-            f.write("</body>\n</html>\n")
-
-        # await update.message.reply_document(document=open(input_html, "rb"), filename=Path(input_html).name)
-
-        cmd = [CONVERT_PATH, input_html, epub_output, "--cover", cover_image_path, "--page-breaks-before", "/"]
+        extract_dir = tempfile.mkdtemp()
         try:
-            subprocess.run(cmd, check=True)
-            output_path = epub_output
-            logger.info(f"Converted manga ZIP to EPUB: {epub_output}")
-            input_path = epub_output
-            output_path = epub_output
-            # Явно прописываем метаданные
-            try:
-                meta_cmd = [METADATA_TOOL, epub_output, "--title", title]
-                if author:
-                    meta_cmd += ["--authors", author]
-                subprocess.run(meta_cmd, check=True)
-                logger.info(f"Set EPUB metadata for manga: title='{title}' author='{author}'")
-            except subprocess.CalledProcessError as e:
-                pass
-
-            # --- Установка ISBN для EPUB ---
-            isbn = find_isbn_by_title_author(title, author)
-            if isbn:
-                logger.info(f"Found ISBN: {isbn}")
-                try:
-                    subprocess.run([METADATA_TOOL, epub_output, "--isbn", isbn], check=True)
-                    logger.info(f"Set ISBN for EPUB: {isbn}")
-                except subprocess.CalledProcessError as e:
-                    pass
-            # --- Установка ASIN для EPUB ---
-            asin = find_asin_by_title_author(title, author)
-            if asin:
-                logger.info(f"Found ASIN: {asin}")
-                try:
-                    subprocess.run([METADATA_TOOL, epub_output, "--identifier", f"BookId:amazon:{asin}"], check=True)
-                    logger.info(f"ASIN metadata set using scheme 'BookId:amazon': {asin}")
-                except subprocess.CalledProcessError as e:
-                    pass
-            # Отправка EPUB с полной метаинформацией в Telegram (после ISBN и ASIN)
-            # await update.message.reply_document(document=open(output_path, "rb"), filename=Path(output_path).name, caption="📎 EPUB with full metadata")
-        except subprocess.CalledProcessError as e:
-            pass
-            await update.message.reply_text("❌ Failed to convert manga archive.")
+            unzip_safe(raw_input_path, extract_dir)
+        except Exception as e:
+            await update.message.reply_text(f"❌ Failed to extract archive: {e}")
             return
+
+        fb2_files = sorted(Path(extract_dir).rglob("*.fb2"))
+        if fb2_files:
+            raw_input_path = str(fb2_files[0])
+            ext = ".fb2"
+        else:
+            # Проверка изображений как манга/комикс
+            image_files = sorted([
+                str(p) for p in Path(extract_dir).rglob("*")
+                if p.suffix.lower() in {".jpg", ".jpeg", ".png"}
+            ])
+            if not image_files:
+                await update.message.reply_text("❌ ZIP does not contain FB2 or supported images.")
+                return
+
+            # Конвертация изображений в EPUB (аналогично как было до этого)
+            author, title = guess_author_title_from_filename(file_name)
+            title = title or "Untitled Manga"
+            author = author or "Unknown"
+
+            safe_title = "".join(c for c in title if c.isalnum() or c in " _-").strip()
+            safe_author = "".join(c for c in author if c.isalnum() or c in " _-").strip()
+            base_name = f"{safe_author} - {safe_title}".strip(" -")
+
+            epub_output = f"/tmp/{base_name}.epub"
+            input_html = os.path.join(extract_dir, f"{base_name}.html")
+            cover_image_path = image_files[0]
+
+            with open(input_html, "w") as f:
+                f.write('<!DOCTYPE html>\n<html xmlns="http://www.w3.org/1999/xhtml">\n<head>\n<meta charset="utf-8"/>\n')
+                f.write(f"<title>{title}</title></head>\n<body>\n")
+                for img_path in image_files:
+                    rel_path = os.path.relpath(img_path, extract_dir)
+                    f.write(f'<div><img src="{rel_path}" style="width:100%;"/></div>\n')
+                f.write("</body>\n</html>\n")
+
+            try:
+                subprocess.run([CONVERT_PATH, input_html, epub_output, "--cover", cover_image_path, "--page-breaks-before", "/"], check=True)
+                raw_input_path = epub_output
+                ext = ".epub"
+            except subprocess.CalledProcessError as e:
+                await update.message.reply_text("❌ Failed to convert manga archive.")
+                return
     elif ext == ".cbr":
         import tempfile
         import rarfile
