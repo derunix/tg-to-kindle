@@ -31,4 +31,5 @@ jobs:
           git pull
           docker compose down
           docker compose up -d --build --force-recreate --no-deps --remove-orphans 
+          docker image prune -af
         EOF
