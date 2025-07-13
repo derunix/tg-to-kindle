@@ -36,7 +36,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY bot.py .
-
+COPY unzip_safe.py /app/unzip_safe.py
 # Установка Calibre
 RUN wget -O calibre-installer.sh https://download.calibre-ebook.com/linux-installer.sh && \
     bash calibre-installer.sh && \
