@@ -438,6 +438,14 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
             cmd = [CONVERT_PATH, input_path, output_path]
             if ext == ".pdf" and os.path.exists(DEFAULT_COVER):
                 cmd += ["--cover", DEFAULT_COVER]
+            # --- ВСТАВКА: Добавление метаданных для PDF→EPUB ---
+            if ext == ".pdf":
+                # Попытка угадать название и автора из имени файла
+                author, title = guess_author_title_from_filename(file_name)
+                if title:
+                    cmd += ["--title", title]
+                if author:
+                    cmd += ["--authors", author]
             subprocess.run(cmd, check=True)
         except subprocess.CalledProcessError as e:
             pass
