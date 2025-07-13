@@ -187,15 +187,15 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user_name = update.effective_user.username or update.effective_user.full_name or f"id:{user_id}"
-    kindle_email = get_email(user_id)
     if ADMIN_USER_ID and str(user_id) != str(ADMIN_USER_ID):
         try:
             await context.bot.send_message(
                 chat_id=ADMIN_USER_ID,
-                text=f"👤 User @{user_name} uploaded file: {update.message.document.file_name or update.message.document.file_unique_id}"
+                text=f"📥 @{user_name} uploaded: {update.message.document.file_name or 'unnamed file'}"
             )
         except Exception as e:
             logger.warning(f"Failed to notify admin: {e}")
+    kindle_email = get_email(user_id)
     if not kindle_email:
         await update.message.reply_text("⚠️ Please set your Kindle email first using /setemail.")
         return
