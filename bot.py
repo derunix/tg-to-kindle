@@ -436,8 +436,16 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         try:
             cmd = [CONVERT_PATH, input_path, output_path]
-            if ext == ".pdf" and os.path.exists(DEFAULT_COVER):
-                cmd += ["--cover", DEFAULT_COVER]
+            # --- Вырезаем обложку из первой страницы PDF (требуется ImageMagick) ---
+            if ext == ".pdf":
+                cover_image_path = f"/tmp/{Path(file_name).stem}_cover.jpg"
+                try:
+                    subprocess.run(["convert", f"{raw_input_path}[0]", cover_image_path], check=True)
+                    if os.path.exists(cover_image_path):
+                        cmd += ["--cover", cover_image_path]
+                        logger.info(f"Extracted cover from first page: {cover_image_path}")
+                except Exception as e:
+                    logger.warning(f"Failed to extract cover from PDF: {e}")
             # --- ВСТАВКА: Добавление метаданных для PDF→EPUB ---
             if ext == ".pdf":
                 # Попытка угадать название и автора из имени файла
