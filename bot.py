@@ -428,7 +428,7 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if title or author:
             safe_title = "".join(c for c in title if c.isalnum() or c in " _-").strip()
             safe_author = "".join(c for c in author if c.isalnum() or c in " _-").strip()
-            final_name = f"{safe_author} - {safe_title}".strip(" -") + ".epub"
+            final_name = f"{safe_title} - {safe_author}".strip(" -") + ".epub"
         else:
             final_name = Path(file_name).stem + ".epub"
 
@@ -476,7 +476,7 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if author or title:
                 safe_title = "".join(c for c in title if c.isalnum() or c in " _-").strip()
                 safe_author = "".join(c for c in author if c.isalnum() or c in " _-").strip()
-                new_name = f"{safe_author} - {safe_title}".strip(" -") + ".pdf"
+                new_name = f"{safe_title} - {safe_author}".strip(" -") + ".epub"
                 new_path = f"/tmp/{new_name}"
                 os.rename(input_path, new_path)
                 input_path = new_path
