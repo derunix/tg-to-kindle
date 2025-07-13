@@ -213,6 +213,9 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
         title = meta.get("title", "").strip()
         author = meta.get("author(s)", meta.get("authors", "")).strip()
 
+        # --- PATCH: Подставлять название и автора из имени файла, если метаданные отсутствуют ---
+        if not title and not author:
+            author, title = guess_author_title_from_filename(doc.file_name or "")
         if title or author:
             safe_title = "".join(c for c in title if c.isalnum() or c in " _-").strip()
             safe_author = "".join(c for c in author if c.isalnum() or c in " _-").strip()
