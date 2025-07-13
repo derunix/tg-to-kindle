@@ -447,6 +447,8 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 os.rename(input_path, new_path)
                 input_path = new_path
                 output_path = new_path
+        else:
+            output_path = input_path
 
     await update.message.reply_text("📤 Sending to Kindle...")
 
